@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import Thread from "../models/thread.model";
 import User from "../models/user.model";
 import { connectToDB } from "../mongoose";
-import { skip } from "node:test";
 
 interface Params {
     text: string,
@@ -67,7 +66,56 @@ export async function fetchThread(pageNumber = 1, pageSize = 20) {
 
         return { posts, isNext }
 
-    } catch (err) {
+    } catch (err: any) {
+        throw new Error(`Error when fetch all threads! ${err.message}`)
+    }
+}
+/**
+ * @param id 
+ * @returns 
+ * 
+    thread: [{
+        _id, text, author, createdAt
+        , children: [{
+            _id, id, name, parentId, image
+                , children: [{
+                    _id, id, name, parentId, image
+                 }]
+             }]
+        }]
+ */
+export async function fetchThreadById(id: String) {
+    connectToDB();
+    try {
+        // TODO: Populate Community
+        const thread = await Thread.findById(id)
+            .populate({
+                path: "author",
+                select: "_id id name image",
+                model: User
+            })
+            .populate({
+                path: 'children',
+                populate: [
+                    {
+                        path: 'author',
+                        select: '_id id name parentId image',
+                        model: User
+                    },
+                    {
+                        path: 'children',
+                        model: Thread,
+                        populate: {
+                            path: 'author',
+                            model: User,
+                            select: "_id id name parentId image"
+                        }
+                    }
+                ]
+            }).exec();
 
+        return thread
+    } catch (err: any) {
+        throw new Error(`Error when fetch thread! ${err.message}`)
     }
 }
