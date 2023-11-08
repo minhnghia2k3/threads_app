@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import User from "../models/user.model";
 import { connectToDB } from "../mongoose";
+import path from "path";
+import Thread from "../models/thread.model";
 
 // connect to mongodb
 interface Params {
@@ -25,18 +27,25 @@ export async function updateUser({ userId,
 ): Promise<void> {
     connectToDB();
     try {
-        await User.findOneAndUpdate(
-            { id: userId },
-            {
-                username: username.toLowerCase(),
-                name,
-                bio,
-                image,
-                path,
-                onboardingStatus: true
-            },
-            { upsert: true } //update ( exists rows ) and insert ( non-exist rows)
-        )
+        const existingUser = await User.findOne({ username: username.toLowerCase() })
+
+        if (existingUser && existingUser.id !== userId) {
+            throw new Error(`Username ${username} is already taken. Please choose a different username.`);
+        }
+        else {
+            await User.findOneAndUpdate(
+                { id: userId },
+                {
+                    username: username.toLowerCase(),
+                    name,
+                    bio,
+                    image,
+                    path,
+                    onboardingStatus: true
+                },
+                { upsert: true } //update ( exists rows ) and insert ( non-exist rows)
+            )
+        }
 
         if (path === '/profile/edit')
             revalidatePath(path);
@@ -58,5 +67,30 @@ export async function fetchUser(userId: string) {
     }
     catch (err: any) {
         throw new Error(`Failed to fetch user ${err.message}`)
+    }
+}
+
+export async function fetchUserPosts(userId: string) {
+    try {
+        connectToDB();
+
+        // Find all threads author by user with the given userId
+        // TODO: Populate community
+        const threads = await User.findOne({ id: userId }).populate({
+            path: "threads",
+            model: Thread,
+            populate: {
+                path: "children",
+                model: Thread,
+                populate: {
+                    path: "author",
+                    model: User,
+                    select: "name image id"
+                }
+            }
+        })
+        return threads;
+    } catch (err: any) {
+        throw new Error(`Error when get users posts! ${err.message}`)
     }
 }
