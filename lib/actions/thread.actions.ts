@@ -84,7 +84,7 @@ export async function fetchThread(pageNumber = 1, pageSize = 20) {
              }]
         }]
  */
-export async function fetchThreadById(id: String) {
+export async function fetchThreadById(id: string) {
     connectToDB();
     try {
         // TODO: Populate Community
@@ -118,4 +118,38 @@ export async function fetchThreadById(id: String) {
     } catch (err: any) {
         throw new Error(`Error when fetch thread! ${err.message}`)
     }
+}
+export async function addCommentToThread(
+    threadId: string,
+    commentText: string,
+    userId: string,
+    path: string
+) {
+    connectToDB();
+    try {
+        // Find the original thread by its ID
+        const originalThread = await Thread.findById(threadId);
+
+        if (!originalThread) {
+            throw new Error(`Thread not found!`)
+        }
+
+        // Create new thread with comment
+        const commentThread = await Thread.create({
+            text: commentText,
+            author: userId,
+            parentId: threadId
+        })
+
+        // Update the original thread to include the new comment
+        originalThread.children.push(commentThread._id)
+
+        // save the original thread
+        await originalThread.save();
+
+        revalidatePath(path);
+    } catch (err: any) {
+        throw new Error(`Error when comment to thread: ${err.message}`)
+    }
+
 }
