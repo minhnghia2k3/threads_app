@@ -147,3 +147,32 @@ export async function fetchUsers({
         throw new Error(`Error when fetch all users! ${err.message}`)
     }
 }
+/**
+ * Concatenates child thread IDs from an array of user threads.
+ * @param {Array} userThreads - Array of user thread objects with 'id' and 'children' properties.
+ * @returns {Array} - Merged array containing all child thread IDs.
+ */
+export async function getActivity(userId: string) {
+    try {
+        connectToDB();
+
+        // Find all threads created by the user
+        const userThreads = await Thread.find({ author: userId })
+        // Collect all the child thread ids (replies) from the 'children' field
+        const childThreadIds = userThreads.reduce((acc, userThread) => {
+            return acc.concat(userThread.children)
+        }, [])
+        // Get the replies (include in childThreadIds but not equal to userId)
+        const replies = await Thread.find({
+            _id: { $in: childThreadIds },
+            author: { $ne: userId }
+        }).populate({
+            path: "author",
+            model: User,
+            select: "name image _id"
+        })
+        return replies;
+    } catch (err: any) {
+        throw new Error(`Failed to fetch activity: ${err.message}`)
+    }
+}

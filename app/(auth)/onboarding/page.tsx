@@ -1,5 +1,6 @@
 import AccountProfile from "@/components/forms/AccountProfile";
 import { currentUser } from "@clerk/nextjs"
+import { redirect } from "next/navigation";
 async function Page() {
     const user = await currentUser();
     const userInfo = {}
@@ -11,6 +12,8 @@ async function Page() {
         bio: userInfo?.bio || "",
         image: userInfo?.image || user.imageUrl,
     }
+
+    if (userInfo) redirect('/')
     return (
         <main className="mx-auto flex flex-col justify-start px-10 py-20 max-w-3xl">
             <h1 className="head-text">Onboarding</h1>
