@@ -5,6 +5,7 @@ import User from "../models/user.model";
 import { connectToDB } from "../mongoose";
 import path from "path";
 import Thread from "../models/thread.model";
+import { FilterQuery, SortOrder } from "mongoose";
 
 // connect to mongodb
 interface Params {
@@ -92,5 +93,57 @@ export async function fetchUserPosts(userId: string) {
         return threads;
     } catch (err: any) {
         throw new Error(`Error when get users posts! ${err.message}`)
+    }
+}
+/**
+ *  PURPOSE: Get all users, not equal currentUserId, find depend on Regex
+ *  Get max 20 records per page 
+ */
+export async function fetchUsers({
+    userId,
+    searchString = "",
+    pageNumber = 1,
+    pageSize = 20,
+    sortBy = "desc"
+}: {
+    userId: string,
+    searchString?: string,
+    pageNumber?: number,
+    pageSize?: number,
+    sortBy?: SortOrder
+}) {
+    try {
+        connectToDB();
+        const skipAmount = (pageNumber - 1) * pageSize;
+        const regex = new RegExp(searchString, "i") // insensitive: Không phân biệt hoa & thường
+
+        // Fetching users
+        const query: FilterQuery<typeof User> = {
+            id: { $ne: userId }
+        } // $ne: not equal
+
+        // Searching by username or name depend on `regex`
+        if (searchString.trim() !== "") {
+            query.$or = [
+                { username: { $regex: regex } },
+                { name: { $regex: regex } }
+            ]
+        }
+
+        // Sorting
+        const sortOptions = { createdAt: sortBy }
+
+        // query: not currentUserId, if have searchString => find depend on regex
+        const usersQuery = User.find(query)
+            .sort(sortOptions)
+            .skip(skipAmount)
+            .limit(pageSize)
+
+        const totalUsersCount = await User.countDocuments(query)
+        const users = await usersQuery.exec();
+        const isNext = totalUsersCount > users.length + skipAmount
+        return { users, isNext }
+    } catch (err: any) {
+        throw new Error(`Error when fetch all users! ${err.message}`)
     }
 }
